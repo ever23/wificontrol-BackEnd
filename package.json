@@ -1,0 +1,32 @@
+{
+  "name": "wificontrol-js",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "nodemon app.js",
+    "start": "node ./bin/www",
+    "run-db": "node ./sqlite.js"
+  },
+  "dependencies": {
+    "axios": "^0.24.0",
+    "bcrypt-nodejs": "0.0.3",
+    "body-parse": "^0.1.0",
+    "cookie-parser": "~1.4.3",
+    "dbtabla": "^0.8.8",
+    "debug": "~2.6.9",
+    "dotenv": "^10.0.0",
+    "ejs": "~2.5.7",
+    "express": "~4.16.0",
+    "express-session": "^1.15.6",
+    "fpdf-njs": "^1.0.0",
+    "html-pdf": "^2.2.0",
+    "http-errors": "~1.6.2",
+    "luxon": "^2.2.0",
+    "morgan": "^1.9.1",
+    "passport": "^0.5.2",
+    "passport-local": "^1.0.0",
+    "sqlite3-tab": "^1.2.0",
+    "tabla-model": "^1.4.0",
+    "web-push": "^3.4.5"
+  }
+}

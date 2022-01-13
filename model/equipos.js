@@ -1,0 +1,80 @@
+/**
+* tabla equipos
+* Fri Jan 25 2019 16:43:06 GMT-0400 (GMT-04:00)
+*/
+const tablaModel = require("tabla-model")
+const equipos=new tablaModel("equipos",{
+    colums:[
+        {
+            name:"id_equipo",
+            type:"int(11)",
+            primary:true,
+            defaultNull:false,
+            autoincrement:true,
+        },
+        {
+            name:"id_cliente",
+            type:"int(11)",
+            defaultNull:false,
+        },
+        {
+            name:"tiempo",
+            type:"varchar(5)",
+            defaultNull:false,
+        },
+        {
+            name:"costo",
+            type:"float",
+            defaultNull:false,
+        },
+        {
+            name:"tPago",
+            type:"varchar(20)",
+            defaultNull:false,
+        },
+        {
+            name:"referencia",
+            type:"varchar(4)",
+            defaultNull:true,
+        },
+        {
+            name:"apertura",
+            type:"varchar(5)",
+            defaultNull:false,
+        },
+        {
+            name:"cierre",
+            type:"varchar(5)",
+            defaultNull:true,
+        },
+        {
+            name:"activo",
+            type:"BOOLEAN",
+            defaultNull:false,
+        },
+        {
+            name:"fecha",
+            type:"DATE",
+            defaultNull:false,
+        },
+        {
+            name:"mac",
+            type:"varchar(20)",
+            defaultNull:true,
+        },
+        {
+            name:"ip",
+            type:"varchar(15)",
+            defaultNull:true,
+        }
+    ],
+    foreingKey:[
+        {
+            key:"id_cliente",
+            reference:"clientes",
+            keyReference:"id_cliente",
+        }
+    ]
+})
+
+module.exports = equipos

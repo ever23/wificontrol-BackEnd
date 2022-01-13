@@ -1,0 +1,121 @@
+const express = require('express')
+const router = express.Router()
+const auth = require('../lib/auth.js')
+const bcrypt = require('bcrypt-nodejs')
+const passport = require('../lib/passport/local-auth.js')
+const SALT = 10;
+
+router.post('/', (req, res, next) => {
+    let user = req.body.user,
+        pass = req.body.pass
+    Users = req.sqlite.tabla('usuarios')
+    Sessiones = req.sqlite.tabla('sessiones')
+
+    Users.selectOne(`user='${user}'`)
+        .then(data => {
+            if (!data) {
+                res.json({ login: false, error: "Nombre de Usuario  invalido" })
+                return data
+            }
+            if (!bcrypt.compareSync(pass, data.hash)) {
+                res.json({ login: false, error: "La contraseña es invalida" })
+                return data
+            }
+
+            let resData = {
+                id_user: data.id_usuarios,
+                user: data.user,
+                nombres: data.nombres,
+                apellidos: data.apellidos,
+                permisos: data.permisos,
+                token: req.sessionID,
+                login: true
+            }
+            //console.log(req.session,req.sessionID,data)
+            req.session.user = resData
+            req.session.user.hash = data.hash
+            Sessiones.insert(req.sessionID, new Date(), data.id_usuarios)
+                .then(ok => {
+
+                    res.json({
+                        login: true,
+                        data: resData
+                    })
+
+                }).catch(e => {
+                    req.session.destroy(function (err) {
+                        console.log(err)
+                        res.json({
+                            login: false,
+                            error: 'Sesion exixtente intente de nuevo'
+                        })
+                    })
+                })
+        }).catch(e => {
+            console.log(e)
+            res.json({
+                login: '2',
+                error: ` ${e}`
+            }) 
+        })
+});
+router.get('/islogin', (req, res, next) => {
+    auth.auth(req).then(data => {
+        let resData = {
+            id_user: data.id_usuarios,
+            user: data.user,
+            nombres: data.nombres,
+            apellidos: data.apellidos,
+            permisos: data.permisos,
+            token: req.sessionID,
+            login: true
+        }
+        res.json({
+            login: true,
+            data: resData
+        })
+    }).catch(e => {
+        res.json({
+            login: false,
+            data: { login: false },
+            e: e
+        })
+    })
+})
+router.get('/logout', (req, res, next) => {
+    req.session.destroy(function (err) {
+        res.json({ "logout": true })
+    })
+})
+router.post('/registro',auth, async (req, res, next) => {
+    delete req.cookies['connect.sid']
+    delete req.session.user
+    let Request = req.body
+
+    let Users = req.sqlite.tabla('usuarios')
+    if (Request['pass1'] != Request['pass2']) {
+        return res.json({ ok: false, error: "Contraseñas no coiciden " })
+    }
+    const salt = await bcrypt.genSaltSync(SALT);
+    const hash = await bcrypt.hashSync(Request['pass1'], salt);
+    Users.insert(null, Request['user'], hash, Request['nombre']).then(ok => {
+        return res.json({ ok: true, error: "" })
+
+    }).catch(e => {
+        return res.json({ ok: false, error: e })
+    })
+
+})
+router.get('/lista', auth,(req, res, next) => {
+
+    let Users = req.sqlite.tabla('usuarios')
+    Users.select().then(data => {
+
+        return res.json(data)
+
+    }).catch(e => {
+        return res.json(e)
+    })
+
+})
+module.exports = router
