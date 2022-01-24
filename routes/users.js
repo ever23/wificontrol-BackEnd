@@ -60,6 +60,7 @@ router.post('/', (req, res, next) => {
         })
 });
 router.get('/islogin', (req, res, next) => {
+    
     auth.auth(req).then(data => {
         let resData = {
             id_user: data.id_usuarios,

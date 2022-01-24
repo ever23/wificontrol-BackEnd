@@ -3,8 +3,8 @@ const router = express.Router()
 const { DateTime } = require("luxon");
 const axios = require("axios")
 const { sqlite3Result } = require("sqlite3-tab")
-
-
+const auth = require('../lib/auth.js');
+const notificaciones = require('../lib/notificaciones.js');
 router.get('/router', (req, res, next) => {
 
     axios.post(`http://192.168.1.1/?code=2&asyn=1&id=${req.query.id}`, "13", {
@@ -29,23 +29,31 @@ router.get('/router', (req, res, next) => {
         })
 })
 
-router.get('/estadisticas', (req, res, next) => {
+router.get('/estadisticas', auth, (req, res, next) => {
     let Equipos = req.sqlite.tabla('equipos')
     let Clientes = req.sqlite.tabla('equipos')
     let time = DateTime.now()
-    Equipos.selectOne(['count(id_equipo) as activos'], 'activo=1').then(d => {
+    Equipos.selectOne([
+        'SUM(iif(activo,1,0)) as activos',
+        "SUM(iif(fecha='" + time.toFormat('dd/LL/yyyy') + "' and  tPago!='',costo,0)) as gananciadia",
+        "SUM(iif(fecha LIKE '%" + time.toFormat("LL/yyyy") + "%' and tPago!='',costo,0)) as gananciames",
+        "SUM(iif(fecha LIKE '%" + time.toFormat("LL/yyyy") + "%' and tPago='Efectivo',costo,0)) as efectivo",
+        "SUM(iif(fecha LIKE '%" + time.toFormat("LL/yyyy") + "%' and tPago='Pagomovil',costo,0)) as pagomovil",
+        "SUM(iif(fecha LIKE '%" + time.toFormat("LL/yyyy") + "%' and tPago='',costo,0)) as deudas",
+    ]).then(data => {
 
-        return Equipos.selectOne(['SUM(costo) as ganancia'], "fecha='" + time.toLocaleString() + "' and tPago!=''").then(d1 => {
-            console.log(time.toFormat("L/y"),time.toLocaleString())
-            console.log("fecha LIKE '"+time.toFormat("L/y")+"' and tPago!=''")
-            return Equipos.selectOne(['SUM(costo) as ganancia'], 
-            "fecha LIKE '%"+time.toFormat("L/y")+"%' and tPago!=''").then(d2 => {
-
-                return Clientes.selectOne(['count() as cantidad']).then(d3 => {
-
-                    return res.json({ activos: d.activos, gananciaDia: d1.ganancia, gananciaMes: d2.ganancia, clientes: d3.cantidad })
-
-                })
+        return Clientes.selectOne(['count() as cantidad']).then(d3 => {
+            let numberFormat = new Intl.NumberFormat('es-ES', {
+                minimumFractionDigits: 2
+            })
+            return res.json({
+                activos: data.activos,
+                gananciaDia: numberFormat.format(data.gananciadia),
+                gananciaMes: numberFormat.format(data.gananciames),
+                efectivo: numberFormat.format(data.efectivo),
+                pagomovil: numberFormat.format(data.pagomovil),
+                deudas: numberFormat.format(data.deudas),
+                clientes: d3.cantidad,
             })
 
         })
@@ -58,58 +66,58 @@ router.get('/estadisticas', (req, res, next) => {
 })
 
 
-router.get('/hoy', (req, res, next) => {
-    console.log(req.session)
+router.get('/hoy', auth, (req, res, next) => {
+
     let Equipos = req.sqlite.tabla('equipos')
     let time = DateTime.now()
     let fecha = time.toFormat('dd/LL/yyyy')
     Equipos.select(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, "fecha='" + fecha + "'", null, null, "id_equipo DESC")
-    .then(data => {
+        .then(data => {
 
-        return res.json(data)
+            return res.json(data)
 
-    }).catch(e => {
-        return res.json(e)
-    })
+        }).catch(e => {
+            return res.json(e)
+        })
 
 })
-router.get('/busqueda', (req, res, next) => {
+router.get('/busqueda', auth, (req, res, next) => {
 
     let Equipos = req.sqlite.tabla('equipos')
     let time = DateTime.now()
     Equipos.busqueda(req.query.q,
-        ['clientes.nombre','equipos.tpago','equipos.referencia','equipos.fecha'],
-        ['clientes.nombre', 'equipos.*'], 
-        { '>clientes': 'id_cliente' }, 
-        "fecha LIKE '%"+time.toFormat("LL/yyyy")+"%'", 
-        null, 
-        null, 
+        ['clientes.nombre', 'equipos.tpago', 'equipos.referencia', 'equipos.fecha'],
+        ['clientes.nombre', 'equipos.*'],
+        { '>clientes': 'id_cliente' },
+        "fecha LIKE '%" + time.toFormat("LL/yyyy") + "%'",
+        null,
+        null,
         "id_equipo DESC")
-    .then(data => {
+        .then(data => {
 
-        return res.json(data)
+            return res.json(data)
 
-    }).catch(e => {
-        return res.json(e)
-    })
+        }).catch(e => {
+            return res.json(e)
+        })
 
 })
 
-router.get('/', (req, res, next) => {
+router.get('/', auth, (req, res, next) => {
 
     let Equipos = req.sqlite.tabla('equipos')
     let time = DateTime.now()
     Equipos.select(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, null, null, null, "id_equipo DESC")
-    .then(data => {
+        .then(data => {
 
-        return res.json(data)
+            return res.json(data)
 
-    }).catch(e => {
-        return res.json(e)
-    })
+        }).catch(e => {
+            return res.json(e)
+        })
 
 })
-router.get('/cliente', (req, res, next) => {
+router.get('/cliente', auth, (req, res, next) => {
 
     let Equipos = req.sqlite.tabla('equipos')
     Equipos.select(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, "id_cliente=" + req.query.id_cliente + "").then(data => {
@@ -163,7 +171,7 @@ router.post('/', (req, res, next) => {
                     resData.apertura,
                     resData.cierre,
                     true,
-                    fecha.toLocaleString()
+                    fecha.toFormat('dd/LL/yyyy')
                 ).then(d => {
 
                     Equipos.selectOne(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, null, null, null, "id_equipo DESC").then(data => {
@@ -191,7 +199,7 @@ router.post('/', (req, res, next) => {
 
 })
 
-router.delete('/', (req, res, next) => {
+router.delete('/', auth, (req, res, next) => {
 
     let Equipos = req.sqlite.tabla('equipos')
     Equipos.delete({ id_equipo: req.query.id_equipo }).
@@ -203,7 +211,7 @@ router.delete('/', (req, res, next) => {
         })
 
 })
-router.put('/', (req, res, next) => {
+router.put('/', auth, (req, res, next) => {
     let equipo = req.body
     let Equipos = req.sqlite.tabla('equipos')
 
@@ -216,15 +224,49 @@ router.put('/', (req, res, next) => {
 
 })
 
-router.put('/desactivar', (req, res, next) => {
+router.put('/desactivar', auth, (req, res, next) => {
 
     let id_equipo = req.body.id_equipo
     let Equipos = req.sqlite.tabla('equipos')
     Equipos.update({ activo: false }, { id_equipo: id_equipo }).then(d => {
+        Equipos.selectOne(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' },"id_equipo='"+id_equipo+"'").then(d2=>{
+            notificaciones.dispararNotificacion(sqlite, "A finalizado el tiempo del equipo " + d2.nombre + "", "", "", "")
+        })
+        
         return res.json({ ok: true, error: "" })
+   
     }).catch(e => {
         console.log(e)
         return res.json({ ok: true, error: e })
+    })
+
+})
+router.get('/equipo', (req, res, next) => {
+
+    let Equipos = req.sqlite.tabla('equipos')
+    Equipos.selectOne(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, "id_equipo=" + req.query.id_equipo + "").then(data => {
+
+        return res.json(data)
+
+    }).catch(e => {
+        return res.json({error:e})
+    })
+
+})
+router.get('/cliente-activo', (req, res, next) => {
+
+    let Equipos = req.sqlite.tabla('equipos')
+    Equipos.select(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, "id_cliente=" + req.query.id_cliente + " and activo=true").then(data => {
+
+        if(data.length==1){
+          
+            return res.json(data[0])
+        }else{
+            return res.json({error:true})
+        }
+    
+    }).catch(e => {
+        return res.json({error:e})
     })
 
 })

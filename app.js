@@ -17,15 +17,8 @@ var app = express();
 app.set('views', path.join(__dirname, 'views'))
 app.set('view engine', 'ejs');
 const port = 8082
-app.listen(port, (req, res) => {
-    console.log("Iniciado en http://localhost:" + port)
-    setInterval(() => {
-        console.log('verificando...')
-        equipos.verificarActivos(connect).then(d => {
-            console.log('listo!')
-        })
-    }, 10000);
-})
+
+
 
 app.use(logger('dev'))
 app.use(express.json())
@@ -42,7 +35,7 @@ app.use(cookieParser())
 app.use(passport.initialize())
 app.use(passport.session())
 const staticFileMiddleware = express.static(path.join(__dirname, 'public'))
-app.use(staticFileMiddleware);
+
 
 // Configurar cabeceras y cors
 app.use((req, res, next) => {
@@ -68,13 +61,17 @@ app.use(function (req, res, next) {
     next()
 });
 
-app.use('/api', indexRouter)
-
 app.use(history({
     disableDotRule: true,
-    index: path.join(__dirname, 'index.html'),
-    verbose: true
+    verbose: true,
+    htmlAcceptHeaders: ['text/html', 'application/xhtml+xml'],
 }));
+app.use(staticFileMiddleware);
+app.use('/api', indexRouter)
+app.get('/', function (req, res) {
+    res.render(path.join(__dirname + '/index.html'));
+});
+
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
     next(createError(404))
@@ -94,5 +91,13 @@ app.use(function (err, req, res, next) {
     console.log(err)
     next()
 });
-
+app.listen(port, (req, res) => {
+    console.log("Iniciado en http://localhost:" + port)
+    setInterval(() => {
+        console.log('verificando...')
+        equipos.verificarActivos(connect).then(d => {
+            console.log('listo!')
+        })
+    }, 10000);
+})
 module.exports = app

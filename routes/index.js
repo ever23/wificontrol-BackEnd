@@ -10,6 +10,6 @@ const auth= require('../lib/auth.js');
 router.use('/user',usersRouter);
 router.use('/notificaciones',auth,notificaciones);
 router.use('/settings',auth,settings);
-router.use('/equipos',auth,equipos);
-router.use('/clientes',auth,clientes);
+router.use('/equipos',equipos);
+router.use('/clientes',clientes);
 module.exports = router;
