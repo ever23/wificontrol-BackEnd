@@ -229,12 +229,12 @@ router.put('/desactivar', auth, (req, res, next) => {
     let id_equipo = req.body.id_equipo
     let Equipos = req.sqlite.tabla('equipos')
     Equipos.update({ activo: false }, { id_equipo: id_equipo }).then(d => {
-        Equipos.selectOne(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' },"id_equipo='"+id_equipo+"'").then(d2=>{
+        Equipos.selectOne(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, "id_equipo='" + id_equipo + "'").then(d2 => {
             notificaciones.dispararNotificacion(sqlite, "A finalizado el tiempo del equipo " + d2.nombre + "", "", "", "")
         })
-        
+
         return res.json({ ok: true, error: "" })
-   
+
     }).catch(e => {
         console.log(e)
         return res.json({ ok: true, error: e })
@@ -249,7 +249,7 @@ router.get('/equipo', (req, res, next) => {
         return res.json(data)
 
     }).catch(e => {
-        return res.json({error:e})
+        return res.json({ error: e })
     })
 
 })
@@ -258,19 +258,31 @@ router.get('/cliente-activo', (req, res, next) => {
     let Equipos = req.sqlite.tabla('equipos')
     Equipos.select(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, "id_cliente=" + req.query.id_cliente + " and activo=true").then(data => {
 
-        if(data.length==1){
-          
+        if (data.length == 1) {
+
             return res.json(data[0])
-        }else{
-            return res.json({error:true})
+        } else {
+            return res.json({ error: true })
         }
-    
+
     }).catch(e => {
-        return res.json({error:e})
+        return res.json({ error: e })
     })
 
 })
+router.get('/pendientes', (req, res, next) => {
+
+    let Equipos = req.sqlite.tabla('equipos')
+    Equipos.select(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, "id_cliente=" + req.query.id_cliente + " and activo=false and tpago=''").then(data => {
 
 
+        return res.json(data)
+
+
+    }).catch(e => {
+        return res.json({ error: e })
+    })
+
+})
 
 module.exports = router

@@ -98,6 +98,6 @@ app.listen(port, (req, res) => {
         equipos.verificarActivos(connect).then(d => {
             console.log('listo!')
         })
-    }, 10000);
+    }, 60000);
 })
 module.exports = app
