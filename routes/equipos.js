@@ -5,29 +5,8 @@ const axios = require("axios")
 const { sqlite3Result } = require("sqlite3-tab")
 const auth = require('../lib/auth.js');
 const notificaciones = require('../lib/notificaciones.js');
-router.get('/router', (req, res, next) => {
-
-    axios.post(`http://192.168.1.1/?code=2&asyn=1&id=${req.query.id}`, "13", {
-        headers: {}
-    })
-        .then(response => {
-            let data = response.data.split('\r\n')
-            let json = {}
-            data.forEach((d, i) => {
-                let d2 = d.split(' ')
-                if (typeof json[d2[0]] != 'object') {
-                    json[d2[0]] = []
-                }
-                json[d2[0]].push(d2[2])
-
-            })
-            console.log(json)
-            return res.json(response.data)
-        })
-        .catch(error => {
-            console.log(error)
-        })
-})
+const browser = require("../lib/wifiScraping/browser.js")
+const mercusys = require("../lib/wifiScraping/mercusys.js")
 
 router.get('/estadisticas', auth, (req, res, next) => {
     let Equipos = req.sqlite.tabla('equipos')
@@ -144,7 +123,9 @@ router.post('/', (req, res, next) => {
             resData.apertura,
             resData.cierre,
             true,
-            fecha.toFormat('dd/LL/yyyy')
+            fecha.toFormat('dd/LL/yyyy'),
+            resData.mac,
+            resData.ip
         )
             .then(d => {
 
@@ -229,11 +210,22 @@ router.put('/desactivar', auth, (req, res, next) => {
     let id_equipo = req.body.id_equipo
     let Equipos = req.sqlite.tabla('equipos')
     Equipos.update({ activo: false }, { id_equipo: id_equipo }).then(d => {
-        Equipos.selectOne(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, "id_equipo='" + id_equipo + "'").then(d2 => {
+        Equipos.selectOne(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, "id_equipo='" + id_equipo + "'").then(async d2 => {
             notificaciones.dispararNotificacion(sqlite, "A finalizado el tiempo del equipo " + d2.nombre + "", "", "", "")
+            let wifi = new mercusys(browser)
+            console.log(d2.ip)
+            let page = await wifi.open(process.env.MERCUSYS_PASS)
+            await wifi.verInvidatos()
+            console.log(d2.ip)
+            let r=await wifi.bloqueraEquipo(d2.ip)
+            page.close()
+            return res.json({ ok: r, error: "" })
+        }).catch(e => {
+            console.log(e)
+            return res.json({ ok: true, error: e })
         })
-
-        return res.json({ ok: true, error: "" })
+    
+        
 
     }).catch(e => {
         console.log(e)

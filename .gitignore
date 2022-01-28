@@ -6,5 +6,5 @@ npm-debug.log.*
 thumbs.db
 package-lock.json
 .env
-wifi.db
+./wifi.db
 !.gitkeep

@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "nodemon app.js",
     "start": "node ./bin/www",
-    "pro":"pm2 start app.js --name wificontrol",
+    "pro": "pm2 start app.js --name wificontrol",
     "run-db": "node ./sqlite.js"
   },
   "dependencies": {
@@ -26,6 +26,7 @@
     "morgan": "^1.9.1",
     "passport": "^0.5.2",
     "passport-local": "^1.0.0",
+    "puppeteer-core": "^13.1.2",
     "sqlite3-tab": "^1.2.0",
     "tabla-model": "^1.4.0",
     "web-push": "^3.4.5"
