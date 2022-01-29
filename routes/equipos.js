@@ -8,6 +8,7 @@ const notificaciones = require('../lib/notificaciones.js');
 const browser = require("../lib/wifiScraping/browser.js")
 const mercusys = require("../lib/wifiScraping/mercusys.js")
 
+
 router.get('/estadisticas', auth, (req, res, next) => {
     let Equipos = req.sqlite.tabla('equipos')
     let Clientes = req.sqlite.tabla('equipos')
@@ -60,6 +61,24 @@ router.get('/hoy', auth, (req, res, next) => {
         })
 
 })
+
+
+router.get('/activos', (req, res, next) => {
+
+    let Equipos = req.sqlite.tabla('equipos')
+    let time = DateTime.now()
+    let fecha = time.toFormat('dd/LL/yyyy')
+    Equipos.select(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, "fecha='" + fecha + "' and activo", null, null, "id_equipo DESC")
+        .then(data => {
+
+            return res.json(data)
+
+        }).catch(e => {
+            return res.json(e)
+        })
+
+})
+
 router.get('/busqueda', auth, (req, res, next) => {
 
     let Equipos = req.sqlite.tabla('equipos')
@@ -213,11 +232,10 @@ router.put('/desactivar', auth, (req, res, next) => {
         Equipos.selectOne(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, "id_equipo='" + id_equipo + "'").then(async d2 => {
             notificaciones.dispararNotificacion(sqlite, "A finalizado el tiempo del equipo " + d2.nombre + "", "", "", "")
             let wifi = new mercusys(browser)
-            console.log(d2.ip)
-            let page = await wifi.open(process.env.MERCUSYS_PASS)
+            let page = await wifi.open()
             await wifi.verInvidatos()
-            console.log(d2.ip)
-            let r=await wifi.bloqueraEquipo(d2.ip)
+            let r=await wifi.bloqueraEquipo(req.body.ip)
+            res.json({ok:r})
             page.close()
             return res.json({ ok: r, error: "" })
         }).catch(e => {
@@ -237,6 +255,18 @@ router.get('/equipo', (req, res, next) => {
 
     let Equipos = req.sqlite.tabla('equipos')
     Equipos.selectOne(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, "id_equipo=" + req.query.id_equipo + "").then(data => {
+
+        return res.json(data)
+
+    }).catch(e => {
+        return res.json({ error: e })
+    })
+
+})
+router.get('/mac', (req, res, next) => {
+
+    let Equipos = req.sqlite.tabla('equipos')
+    Equipos.selectOne(['clientes.nombre', 'equipos.*','count(clientes.id_cliente) as conexiones'], { '>clientes': 'id_cliente' }, 'mac="' + req.query.mac + '"',null,null,"conexiones").then(data => {
 
         return res.json(data)
 

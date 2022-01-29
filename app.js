@@ -91,13 +91,32 @@ app.use(function (err, req, res, next) {
     console.log(err)
     next()
 });
-app.listen(port, (req, res) => {
+const http = require('http')
+const browser = require("./lib/wifiScraping/browser.js")
+const mercusys = require("./lib/wifiScraping/mercusys.js")
+const server = http.createServer(app).listen(port, (req, res) => {
     console.log("Iniciado en http://localhost:" + port)
     setInterval(() => {
         console.log('verificando...')
-        equipos.verificarActivos(connect).then(d => {
+        equipos.verificarActivos(connect).then(async desactivados => {
+
+
+            if (desactivados.length > 0) {
+                let wifi = new mercusys(browser)
+                let page = await wifi.open()
+                await wifi.verInvidatos()
+                for (let des of desactivados) {
+                    let r = await wifi.bloqueraEquipo(desactivados.ip)
+                    res.json({ ok: r })
+                    
+                }
+                page.close()
+            }
             console.log('listo!')
+
         })
     }, 60000);
 })
+
+require('./lib/wifiScraping/socket')(app, server)
 module.exports = app
