@@ -4,7 +4,7 @@ const auth = require('../lib/auth.js')
 const browser = require("../lib/wifiScraping/browser.js")
 const mercusys = require("../lib/wifiScraping/mercusys.js")
 
-router.get('/', auth, async (req, res, next) => {
+router.get('/', async (req, res, next) => {
 
     let wifi = new mercusys(browser)
     let page = await wifi.open()
@@ -15,7 +15,6 @@ router.get('/', auth, async (req, res, next) => {
     }, "invitado")
     await page.waitForSelector("#bEptList > .bEptLHDInfo > .bEptLogoImg");
     page.close()
-
 })
 
 router.post('/bloquear', auth, async (req, res, next) => {
@@ -36,18 +35,30 @@ router.post('/desbloquear', auth, async (req, res, next) => {
     res.json({ ok: r })
     page.close()
 })
-router.post('/renombrar', auth, async (req, res, next) => {
+router.post('/renombrar', async (req, res, next) => {
 
     let wifi = new mercusys(browser)
     let page = await wifi.open()
-    let ok = await page.evaluate((ip, clase) => {
-        const http = new XMLHttpRequest()
-      
+    let url =""
+    var id = "";
+    page.on("response", async (response) => {
+        if (response.url().includes('?code=2&asyn=1&id')) {
+            id = response.url().split("&")[2].slice(3)
+        }
+
+    })
+    await page.waitForSelector('.bEptLHDInfo > .bEptHostInfo > .bEptIp')
+    let ok = await page.evaluate(async (id) => {
+        
+        return (await fetch("http://192.168.1.1/?code=0&asyn=0&id="+id, {
+          body: "main staMgt -add mac:80-9b-20-c2-04-18 name:santi upload:0 download:0",
+          method: 'POST',
+          })).text();
 
 
-    }, ip, clase);
+    },id);
 
-    res.json({ ok: r })
+    res.json({ ok: ok,id:id })
     page.close()
 })
 module.exports = router

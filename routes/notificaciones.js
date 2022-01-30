@@ -13,8 +13,13 @@ router.post('/suscribir', (req, res, next) => {
     })
 })
 router.post('/disparar', (req, res, next) => {
-
+    console.log(req.io)
     notificacion.dispararNotificacion(req.sqlite, req.body.text,"","","")
+   
+    req.io.emit("notificacion",{
+        title: "Control De Wifi",
+        message:req.body.text
+    })
     return res.json({ ok: false })
 
 })

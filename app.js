@@ -16,7 +16,7 @@ var app = express();
 // view engine setup
 app.set('views', path.join(__dirname, 'views'))
 app.set('view engine', 'ejs');
-const port = 8082
+const port = process.env.PORT
 
 
 
@@ -69,7 +69,7 @@ app.use(history({
 app.use(staticFileMiddleware);
 app.use('/api', indexRouter)
 app.get('/', function (req, res) {
-    res.render(path.join(__dirname + '/index.html'));
+    res.render(path.join(__dirname + '/public/index.html'));
 });
 
 // catch 404 and forward to error handler
@@ -96,6 +96,7 @@ const browser = require("./lib/wifiScraping/browser.js")
 const mercusys = require("./lib/wifiScraping/mercusys.js")
 const server = http.createServer(app).listen(port, (req, res) => {
     console.log("Iniciado en http://localhost:" + port)
+    var io  = require('./lib/wifiScraping/socket')(app, server);
     setInterval(() => {
         console.log('verificando...')
         equipos.verificarActivos(connect).then(async desactivados => {
@@ -104,11 +105,16 @@ const server = http.createServer(app).listen(port, (req, res) => {
             if (desactivados.length > 0) {
                 let wifi = new mercusys(browser)
                 let page = await wifi.open()
-                await wifi.verInvidatos()
+                wifi.equiposConectados(json => { }, "invitado")
+                await page.waitForSelector('.bEptLHDInfo > .bEptHostInfo > .bEptIp')
                 for (let des of desactivados) {
-                    let r = await wifi.bloqueraEquipo(desactivados.ip)
-                    res.json({ ok: r })
-                    
+                    io.emit("notificacion",{
+                        title: "Control De Wifi",
+                        message:"Finalizo el tiempo de "+des.nombre+" "+des.ip+" "+des.mac
+                    })
+
+                    let r = await wifi.actualizarEquipo({ mac: des.mac, nombre: des.nombre, bloqueado: true })
+
                 }
                 page.close()
             }
@@ -118,5 +124,5 @@ const server = http.createServer(app).listen(port, (req, res) => {
     }, 60000);
 })
 
-require('./lib/wifiScraping/socket')(app, server)
+
 module.exports = app

@@ -224,6 +224,46 @@ router.put('/', auth, (req, res, next) => {
 
 })
 
+router.put('/cerrar', async (req, res, next) => {
+
+    let id_equipo = req.body.id_equipo
+    let Equipos = req.sqlite.tabla('equipos')
+    let costoHora = 3
+    try {
+        let equipo = await Equipos.selectOne(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, 'id_equipo="' + id_equipo + '"')
+        let time = DateTime.fromFormat(equipo.apertura, 'HH:mm')
+        let time2 = DateTime.now()
+        equipo.tiempo = time2.diff(time).toFormat("hh:mm")
+        equipo.activo = false
+        equipo.cierre = DateTime.now().toFormat("HH:mm")
+        let tiempoSplit = equipo.tiempo.split(":")
+        equipo.costo = (Number(tiempoSplit[0]) + (Number(tiempoSplit[1]) / 60) * costoHora).toLocaleString('en')
+        await equipo.update();
+        (async () => {
+            let wifi = new mercusys(browser)
+            let page = await wifi.open()
+            wifi.equiposConectados(json => { }, "invitado")
+            await page.waitForSelector('.bEptLHDInfo > .bEptHostInfo > .bEptIp')
+
+            let r = await wifi.actualizarEquipo({ mac: equipo.mac, nombre: equipo.nombre, bloqueado: true })
+
+
+            page.close()
+        })()
+
+        return res.json({ ok: true, data: equipo })
+    } catch (e) {
+        console.log(e)
+        return res.json({ ok: false, error: e })
+    }
+
+
+
+
+
+})
+
+
 router.put('/desactivar', auth, (req, res, next) => {
 
     let id_equipo = req.body.id_equipo
@@ -234,16 +274,16 @@ router.put('/desactivar', auth, (req, res, next) => {
             let wifi = new mercusys(browser)
             let page = await wifi.open()
             await wifi.verInvidatos()
-            let r=await wifi.bloqueraEquipo(req.body.ip)
-            res.json({ok:r})
+            let r = await wifi.bloqueraEquipo(req.body.ip)
+            res.json({ ok: r })
             page.close()
             return res.json({ ok: r, error: "" })
         }).catch(e => {
             console.log(e)
             return res.json({ ok: true, error: e })
         })
-    
-        
+
+
 
     }).catch(e => {
         console.log(e)
@@ -254,7 +294,7 @@ router.put('/desactivar', auth, (req, res, next) => {
 router.get('/equipo', (req, res, next) => {
 
     let Equipos = req.sqlite.tabla('equipos')
-    Equipos.selectOne(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, "id_equipo=" + req.query.id_equipo + "").then(data => {
+    Equipos.selectOne(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, "id_equipo=" + req.query.id_equipo + " ").then(data => {
 
         return res.json(data)
 
@@ -266,7 +306,7 @@ router.get('/equipo', (req, res, next) => {
 router.get('/mac', (req, res, next) => {
 
     let Equipos = req.sqlite.tabla('equipos')
-    Equipos.selectOne(['clientes.nombre', 'equipos.*','count(clientes.id_cliente) as conexiones'], { '>clientes': 'id_cliente' }, 'mac="' + req.query.mac + '"',null,null,"conexiones").then(data => {
+    Equipos.selectOne(['clientes.nombre', 'equipos.*', 'count(clientes.id_cliente) as conexiones'], { '>clientes': 'id_cliente' }, 'mac="' + req.query.mac + '"', null, null, "conexiones").then(data => {
 
         return res.json(data)
 
@@ -275,6 +315,25 @@ router.get('/mac', (req, res, next) => {
     })
 
 })
+
+router.get('/mac-activa', (req, res, next) => {
+
+    let Equipos = req.sqlite.tabla('equipos')
+    Equipos.select(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, "id_cliente='" + req.query.mac + "' and activo=true").then(data => {
+
+        if (data.length == 1) {
+
+            return res.json(data[0])
+        } else {
+            return res.json({ error: true })
+        }
+
+    }).catch(e => {
+        return res.json({ error: e })
+    })
+
+})
+
 router.get('/cliente-activo', (req, res, next) => {
 
     let Equipos = req.sqlite.tabla('equipos')
