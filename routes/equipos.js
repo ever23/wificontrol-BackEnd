@@ -5,7 +5,7 @@ const axios = require("axios")
 const { sqlite3Result } = require("sqlite3-tab")
 const auth = require('../lib/auth.js');
 const notificaciones = require('../lib/notificaciones.js');
-const browser = require("../lib/wifiScraping/browser.js")
+
 const mercusys = require("../lib/wifiScraping/mercusys.js")
 
 
@@ -71,7 +71,7 @@ router.get('/activos', (req, res, next) => {
     Equipos.select(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, "fecha='" + fecha + "' and activo", null, null, "id_equipo DESC")
         .then(data => {
 
-            return res.json(data)
+            return res.json(data) 
 
         }).catch(e => {
             return res.json(e)
@@ -239,17 +239,14 @@ router.put('/cerrar', async (req, res, next) => {
         let tiempoSplit = equipo.tiempo.split(":")
         equipo.costo = (Number(tiempoSplit[0]) + (Number(tiempoSplit[1]) / 60) * costoHora).toLocaleString('en')
         await equipo.update();
-        (async () => {
-            let wifi = new mercusys(browser)
+        
+            let wifi = new mercusys()
             let page = await wifi.open()
-            wifi.equiposConectados(json => { }, "invitado")
-            await page.waitForSelector('.bEptLHDInfo > .bEptHostInfo > .bEptIp')
-
+            wifi.equiposConectados(async json => { 
             let r = await wifi.actualizarEquipo({ mac: equipo.mac, nombre: equipo.nombre, bloqueado: true })
-
-
             page.close()
-        })()
+            }, "invitado")
+        
 
         return res.json({ ok: true, data: equipo })
     } catch (e) {
@@ -319,15 +316,9 @@ router.get('/mac', (req, res, next) => {
 router.get('/mac-activa', (req, res, next) => {
 
     let Equipos = req.sqlite.tabla('equipos')
-    Equipos.select(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, "id_cliente='" + req.query.mac + "' and activo=true").then(data => {
+    Equipos.selectOne(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, "mac='" + req.query.mac + "' and activo=true").then(data => {
 
-        if (data.length == 1) {
-
-            return res.json(data[0])
-        } else {
-            return res.json({ error: true })
-        }
-
+        return res.json(data)
     }).catch(e => {
         return res.json({ error: e })
     })

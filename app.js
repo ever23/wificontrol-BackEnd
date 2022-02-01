@@ -62,6 +62,11 @@ app.use(function (req, res, next) {
 });
 
 app.use(history({
+    index: '/cliente/index.html',
+    rewrites: [
+        { from: /\/admin/, to: '/admin/index.html'},
+        
+    ],
     disableDotRule: true,
     verbose: true,
     htmlAcceptHeaders: ['text/html', 'application/xhtml+xml'],
@@ -69,7 +74,7 @@ app.use(history({
 app.use(staticFileMiddleware);
 app.use('/api', indexRouter)
 app.get('/', function (req, res) {
-    res.render(path.join(__dirname + '/public/index.html'));
+    res.render(path.join(__dirname + '/public/cliente/index.html'));
 });
 
 // catch 404 and forward to error handler
@@ -92,7 +97,6 @@ app.use(function (err, req, res, next) {
     next()
 });
 const http = require('http')
-const browser = require("./lib/wifiScraping/browser.js")
 const mercusys = require("./lib/wifiScraping/mercusys.js")
 const server = http.createServer(app).listen(port, (req, res) => {
     console.log("Iniciado en http://localhost:" + port)
@@ -103,10 +107,13 @@ const server = http.createServer(app).listen(port, (req, res) => {
 
 
             if (desactivados.length > 0) {
-                let wifi = new mercusys(browser)
+                let wifi = new mercusys()
                 let page = await wifi.open()
-                wifi.equiposConectados(json => { }, "invitado")
-                await page.waitForSelector('.bEptLHDInfo > .bEptHostInfo > .bEptIp')
+                wifi.equiposConectados(json => {
+
+                    
+                 }, "invitado")
+                
                 for (let des of desactivados) {
                     io.emit("notificacion",{
                         title: "Control De Wifi",
@@ -116,7 +123,7 @@ const server = http.createServer(app).listen(port, (req, res) => {
                     let r = await wifi.actualizarEquipo({ mac: des.mac, nombre: des.nombre, bloqueado: true })
 
                 }
-                page.close()
+                wifi.close()
             }
             console.log('listo!')
 

@@ -1,25 +1,27 @@
 const express = require('express')
 const router = express.Router()
 const auth = require('../lib/auth.js')
-const browser = require("../lib/wifiScraping/browser.js")
-const mercusys = require("../lib/wifiScraping/mercusys.js")
 
+const mercusys = require("../lib/wifiScraping/mercusys.js")
+const puppeteer = require('puppeteer-core');
 router.get('/', async (req, res, next) => {
 
-    let wifi = new mercusys(browser)
+  
+    let wifi = new mercusys()
     let page = await wifi.open()
+    
     let respuesta = []
     wifi.equiposConectados(json => {
 
         res.json(json)
+        wifi.close()
     }, "invitado")
-    await page.waitForSelector("#bEptList > .bEptLHDInfo > .bEptLogoImg");
-    page.close()
+   
 })
 
 router.post('/bloquear', auth, async (req, res, next) => {
 
-    let wifi = new mercusys(browser)
+    let wifi = new mercusys()
     let page = await wifi.open()
     await wifi.verInvidatos()
     let r = await wifi.bloqueraEquipo(req.body.ip)
@@ -28,7 +30,7 @@ router.post('/bloquear', auth, async (req, res, next) => {
 })
 router.post('/desbloquear', auth, async (req, res, next) => {
 
-    let wifi = new mercusys(browser)
+    let wifi = new mercusys()
     let page = await wifi.open()
     await wifi.verInvidatos()
     let r = await wifi.desbloqueraEquipo(req.body.mac)
@@ -37,7 +39,7 @@ router.post('/desbloquear', auth, async (req, res, next) => {
 })
 router.post('/renombrar', async (req, res, next) => {
 
-    let wifi = new mercusys(browser)
+    let wifi = new mercusys()
     let page = await wifi.open()
     let url =""
     var id = "";

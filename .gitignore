@@ -5,6 +5,7 @@ npm-debug.log
 npm-debug.log.*
 thumbs.db
 package-lock.json
+wifi.db
+sqlite.js
 .env
-./wifi.db
 !.gitkeep
