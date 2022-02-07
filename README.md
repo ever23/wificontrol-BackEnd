@@ -1,20 +1,29 @@
 # WifiControl Back-End
 
->  Sistema de control para el alquler de wifi por hora 
+> Api para el [Front-End](https://github.com/ever23/wificontrol-FrontEnd) del sistema de control para el alquler de wifi por hora 
+> Implementa web scraping para controlar un router mercusys 
+> Asigna tiempo de conexion a la red wifi a un equipo y lo bloquea al finalizar el tiempo  
 
-## Build Setup
+## Tecnoclogias usadas
+
+> node.js, express.js, socket.io, puppeteer.js
+
+## Bases de datos 
+
+> SqlIte3
+
+## Requerimientos 
+
+1. node.js>=v14.17.6
+2. npm
+
+## Intalaccion
 
 ``` bash
-# install dependencies
+# Instalar dependecias 
 npm install
 
-# serve with hot reload at localhost:8080
+# inicia el servidro en modo desarrollo
 npm run dev
 
-# build for production with minification in folder up
-npm run build
 
-# build for production and view the bundle analyzer report
-npm run build --report
-
-For a detailed explanation on how things work, check out the [guide](http://vuejs-templates.github.io/webpack/) and [docs for vue-loader](http://vuejs.github.io/vue-loader).

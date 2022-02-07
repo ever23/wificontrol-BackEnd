@@ -6,18 +6,19 @@ const cookieParser = require('cookie-parser')
 const logger = require('morgan')
 const session = require('express-session')
 const sqlite = require("sqlite3-tab")
-const equipos = require("./lib/equipos.js")
-var indexRouter = require('./routes/index')
+const {bloquearFinalizados} = require("./lib/equipos.js")
+const indexRouter = require('./routes/index')
 const history = require('connect-history-api-fallback');
-
 const passport = require('./lib/passport/local-auth.js')
-var app = express();
-
+const http = require('http')
+const app = express();
+const server = http.createServer(app)
+const io = require('./sockets/wifi')(app, server);
 // view engine setup
 app.set('views', path.join(__dirname, 'views'))
 app.set('view engine', 'ejs');
 const port = process.env.PORT
-
+const { DateTime } = require("luxon");
 
 
 app.use(logger('dev'))
@@ -56,26 +57,20 @@ connect.connect(e => {
     console.log(e, "s")
 })
 connect.pathModels(path.dirname(__filename) + '/model')
+
 app.use(function (req, res, next) {
     req.sqlite = connect
     next()
 });
 
 app.use(history({
-    index: '/cliente/index.html',
-    rewrites: [
-        { from: /\/admin/, to: '/admin/index.html'},
-        
-    ],
+    index: 'index.html',
     disableDotRule: true,
     verbose: true,
     htmlAcceptHeaders: ['text/html', 'application/xhtml+xml'],
 }));
 app.use(staticFileMiddleware);
 app.use('/api', indexRouter)
-app.get('/', function (req, res) {
-    res.render(path.join(__dirname + '/public/cliente/index.html'));
-});
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
@@ -96,40 +91,23 @@ app.use(function (err, req, res, next) {
     console.log(err)
     next()
 });
-const http = require('http')
-const mercusys = require("./lib/wifiScraping/mercusys.js")
-const server = http.createServer(app).listen(port, (req, res) => {
+function verificar (time){
+    console.log('verificando...')
+    bloquearFinalizados(connect,io).then(desconectados=>{
+
+        console.log(desconectados)
+      
+    }).catch(e=>{
+        console.log(e)
+    }).finally(()=>{
+        console.log(DateTime.now().toFormat("HH:mm:ss")+' listo...')
+        setTimeout(()=>verificar(time),time)
+    })
+}
+server.listen(port, (req, res) => {
     console.log("Iniciado en http://localhost:" + port)
-    var io  = require('./lib/wifiScraping/socket')(app, server);
-    setInterval(() => {
-        console.log('verificando...')
-        equipos.verificarActivos(connect).then(async desactivados => {
+   verificar(60000)
 
-
-            if (desactivados.length > 0) {
-                let wifi = new mercusys()
-                let page = await wifi.open()
-                wifi.equiposConectados(json => {
-
-                    
-                 }, "invitado")
-                
-                for (let des of desactivados) {
-                    io.emit("notificacion",{
-                        title: "Control De Wifi",
-                        message:"Finalizo el tiempo de "+des.nombre+" "+des.ip+" "+des.mac
-                    })
-
-                    let r = await wifi.actualizarEquipo({ mac: des.mac, nombre: des.nombre, bloqueado: true })
-
-                }
-                wifi.close()
-            }
-            console.log('listo!')
-
-        })
-    }, 60000);
 })
-
 
 module.exports = app

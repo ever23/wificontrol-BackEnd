@@ -5,9 +5,9 @@ const axios = require("axios")
 const { sqlite3Result } = require("sqlite3-tab")
 const auth = require('../lib/auth.js');
 const notificaciones = require('../lib/notificaciones.js');
-
+const { calcularProgreso } = require('../lib/equipos.js');
 const mercusys = require("../lib/wifiScraping/mercusys.js")
-
+const costoHora = 3
 
 router.get('/estadisticas', auth, (req, res, next) => {
     let Equipos = req.sqlite.tabla('equipos')
@@ -39,7 +39,7 @@ router.get('/estadisticas', auth, (req, res, next) => {
         })
     }).catch(e => {
         console.log(e)
-        return res.json(e)
+        return res.json({ok:false,error:"Error al consultar "})
     })
 
 
@@ -57,7 +57,8 @@ router.get('/hoy', auth, (req, res, next) => {
             return res.json(data)
 
         }).catch(e => {
-            return res.json(e)
+            console.log(e)
+            return res.json({ok:false,error:"Error al consultar "})
         })
 
 })
@@ -71,10 +72,11 @@ router.get('/activos', (req, res, next) => {
     Equipos.select(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, "fecha='" + fecha + "' and activo", null, null, "id_equipo DESC")
         .then(data => {
 
-            return res.json(data) 
+            return res.json(data)
 
         }).catch(e => {
-            return res.json(e)
+            console.log(e)
+            return res.json({ok:false,error:"Error al consultar "})
         })
 
 })
@@ -96,7 +98,8 @@ router.get('/busqueda', auth, (req, res, next) => {
             return res.json(data)
 
         }).catch(e => {
-            return res.json(e)
+            console.log(e)
+            return res.json({ok:false,error:"error en la busqueda"})
         })
 
 })
@@ -111,90 +114,73 @@ router.get('/', auth, (req, res, next) => {
             return res.json(data)
 
         }).catch(e => {
-            return res.json(e)
+            console.log(e)
+            return res.json({ok:false,error:"Error al consultar "})
         })
 
 })
 router.get('/cliente', auth, (req, res, next) => {
 
     let Equipos = req.sqlite.tabla('equipos')
-    Equipos.select(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, "id_cliente=" + req.query.id_cliente + "").then(data => {
+    Equipos.select(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, "id_cliente=" + req.query.id_cliente + "",null,null,"tPago").then(data => {
 
         return res.json(data)
 
     }).catch(e => {
-        return res.json(e)
+        console.log(e)
+        return res.json({ok:false,error:"Error al consultar "})
     })
 
 })
-router.post('/', (req, res, next) => {
+router.post('/', async (req, res, next) => {
     let Equipos = req.sqlite.tabla('equipos')
     let Clientes = req.sqlite.tabla('clientes')
     let resData = req.body
-    let fecha = DateTime.now()
-    if (resData.id_cliente != undefined) {
-        Equipos.insert(null,
+    let fecha = DateTime.now().toFormat('dd/LL/yyyy')
+    let apertura = DateTime.now().toFormat('HH:mm')
+    let cierre = ""
+    if (resData.tiempo == "Indefinido") {
+        cierre = "Indefinido"
+        resData.costo = 0
+    } else {
+        let tiempoSplit = resData.tiempo.split(':')
+        cierre = DateTime.now().plus({ hours: tiempoSplit[0], minutes: tiempoSplit[1] }).toFormat('HH:mm')
+        resData.costo = ((Number(tiempoSplit[0]) + (Number(tiempoSplit[1]) / 60)) * costoHora).toLocaleString('en')
+    }
+
+    if (resData.id_cliente == undefined) {
+        try{
+            await Clientes.insert(null, resData.nombre);
+        }catch(e){
+            console.log(e)
+            return res.json({ ok: true, error: "Imposible agregar el cliente" }) 
+        }
+        
+        let cliente = await Clientes.selectOne(null, null, null, null, null, "id_cliente DESC");
+        resData.id_cliente = cliente.id_cliente
+    }
+    try{
+        await Equipos.insert(null,
             resData.id_cliente,
             resData.tiempo,
             resData.costo,
             resData.tPago,
             resData.referencia,
-            resData.apertura,
-            resData.cierre,
+            apertura,
+            cierre,
             true,
-            fecha.toFormat('dd/LL/yyyy'),
+            fecha,
             resData.mac,
             resData.ip
-        )
-            .then(d => {
-
-                Equipos.selectOne(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, null, null, null, "id_equipo DESC").then(data => {
-                    return res.json({ ok: true, data: data })
-                }).catch(e => {
-                    return res.json({ ok: false, error: e })
-                })
-
-            }).catch(e => {
-                console.log(e)
-                return res.json({ ok: false, error: e })
-
-            })
-    } else {
-        Clientes.insert(null, resData.nombre).then(d => {
-            Clientes.selectOne(null, null, null, null, null, "id_cliente DESC").then(newCliente => {
-                Equipos.insert(null,
-                    newCliente.id_cliente,
-                    resData.tiempo,
-                    resData.costo,
-                    resData.tPago,
-                    resData.referencia,
-                    resData.apertura,
-                    resData.cierre,
-                    true,
-                    fecha.toFormat('dd/LL/yyyy')
-                ).then(d => {
-
-                    Equipos.selectOne(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, null, null, null, "id_equipo DESC").then(data => {
-                        return res.json({ ok: true, data: data })
-                    }).catch(e => {
-                        return res.json({ ok: false, error: e })
-                    })
-
-                }).catch(e => {
-                    console.log(e)
-                    return res.json({ ok: false, error: e })
-
-                })
-
-            }).catch(e => {
-                return res.json({ ok: false, error: e })
-            })
-        }).catch(e => {
-            console.log(e)
-            return res.json({ ok: false, error: e })
-
-        })
+        );
+    }catch(e){
+        console.log(e)
+        return res.json({ ok: true, error: "Imposible agregar el Equipo" }) 
     }
+    
+    let equipo = await  Equipos.selectOne(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, null, null, null, "id_equipo DESC")
+    req.io.emit("/equipo/registro", equipo)
+    return res.json({ ok: true, data: equipo })
 
 
 })
@@ -205,18 +191,85 @@ router.delete('/', auth, (req, res, next) => {
     Equipos.delete({ id_equipo: req.query.id_equipo }).
         then(data => {
 
-            return res.json({ ok: true, error: "" })
+            return res.json({ ok: true})
         }).catch(e => {
-            return res.json({ ok: true, error: e })
+            console.log(e)
+            return res.json({ ok: true, error: "No se eliminó" })
         })
+
+})
+router.put('/tiempo', auth, async (req, res, next) => {
+    let update = req.body
+    try {
+        let equipo = await req.sqlite.tabla('equipos').selectOne(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, 'id_equipo="' + req.body.id_equipo + '"')
+        if (equipo.id_equipo) {
+            equipo.tiempo = update.tiempo
+            let tiempoSplit = equipo.tiempo.split(':')
+            equipo.cierre = DateTime.now().plus({ hours: tiempoSplit[0], minutes: tiempoSplit[1] }).toFormat('HH:mm')
+            let progreso = calcularProgreso(equipo.tiempo, equipo.cierre)
+
+            equipo.costo = ((Number(tiempoSplit[0]) + (Number(tiempoSplit[1]) / 60)) * costoHora).toLocaleString('en')
+            if (progreso == 0 || equipo.fecha != DateTime.now().toFormat('dd/LL/yyyy')) {
+                equipo.activo = 0
+            } else {
+                equipo.activo = 1
+            }
+
+            await equipo.update()
+            req.io.emit("/equipo/update/" + equipo.id_equipo, equipo)
+            res.json({ ok: true, error: "", equipo: equipo })
+
+        }
+    } catch (e) {
+        console.log(e)
+        res.json({ ok: false, error: "No se actualizo el tiempo" })
+    }
+
+})
+router.put('/pago', auth, async (req, res, next) => {
+    let update = req.body
+    try {
+        let equipo = await req.sqlite.tabla('equipos').selectOne(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, 'id_equipo="' + req.body.id_equipo + '"')
+        if (equipo.id_equipo) {
+            equipo.tPago = update.tPago
+            equipo.referencia = update.referencia
+
+            await equipo.update()
+            req.io.emit("/equipo/update/" + equipo.id_equipo, equipo)
+            res.json({ ok: true})
+
+        }
+    } catch (e) {
+        console.log(e)
+        res.json({ ok: false, error: "No se actualizo el pago" })
+    }
 
 })
 router.put('/', auth, (req, res, next) => {
     let equipo = req.body
     let Equipos = req.sqlite.tabla('equipos')
 
-    Equipos.update(equipo, { id_equipo: req.body.id_equipo }).then(d => {
-        return res.json({ ok: true, error: "" })
+    Equipos.update(equipo, { id_equipo: req.body.id_equipo }).then(async d => {
+
+        res.json({ ok: true, error: "" })
+
+        let eq = await Equipos.selectOne(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, 'id_equipo="' + req.body.id_equipo + '"')
+        req.io.emit("/equipo/update/" + eq.id_equipo, eq)
+        if (eq.activo) {
+            let wifi = new mercusys()
+            let page = await wifi.open()
+            wifi.equiposConectados(async json => {
+                try {
+                    let r = await wifi.actualizarEquipo({ mac: eq.mac, nombre: eq.nombre, bloqueado: false })
+                } finally {
+                    wifi.close()
+                }
+
+
+            }, "invitado")
+        }
+
+
     }).catch(e => {
         console.log(e)
         return res.json({ ok: true, error: e })
@@ -228,7 +281,7 @@ router.put('/cerrar', async (req, res, next) => {
 
     let id_equipo = req.body.id_equipo
     let Equipos = req.sqlite.tabla('equipos')
-    let costoHora = 3
+
     try {
         let equipo = await Equipos.selectOne(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, 'id_equipo="' + id_equipo + '"')
         let time = DateTime.fromFormat(equipo.apertura, 'HH:mm')
@@ -237,27 +290,38 @@ router.put('/cerrar', async (req, res, next) => {
         equipo.activo = false
         equipo.cierre = DateTime.now().toFormat("HH:mm")
         let tiempoSplit = equipo.tiempo.split(":")
-        equipo.costo = (Number(tiempoSplit[0]) + (Number(tiempoSplit[1]) / 60) * costoHora).toLocaleString('en')
-        await equipo.update();
-        
-            let wifi = new mercusys()
-            let page = await wifi.open()
-            wifi.equiposConectados(async json => { 
-            let r = await wifi.actualizarEquipo({ mac: equipo.mac, nombre: equipo.nombre, bloqueado: true })
-            page.close()
-            }, "invitado")
-        
+        equipo.costo = ((Number(tiempoSplit[0]) + (Number(tiempoSplit[1]) / 60)) * costoHora).toLocaleString('en')
+
+
+        let wifi = new mercusys()
+        let page = await wifi.open()
+        wifi.equiposConectados(async json => {
+            try {
+                let ok = await wifi.actualizarEquipo({ mac: equipo.mac, nombre: equipo.nombre, bloqueado: true })
+                if (ok) {
+
+                    await equipo.update();
+                    req.io.emit("/equipo/update/" + equipo.id_equipo, equipo)
+                    req.io.emit("notificacion", {
+                        title: "Control De Wifi",
+                        message: "Finalizo el tiempo de " + equipo.nombre + " " + equipo.ip + " " + equipo.mac
+                    })
+                } else {
+                    return res.json({ ok: false, error: "no se finalizo la conexion" })
+                }
+
+            } finally {
+                wifi.close()
+            }
+
+        }, "invitado")
+
 
         return res.json({ ok: true, data: equipo })
     } catch (e) {
         console.log(e)
-        return res.json({ ok: false, error: e })
+        return res.json({ok:false,error:"error "})
     }
-
-
-
-
-
 })
 
 
@@ -296,7 +360,9 @@ router.get('/equipo', (req, res, next) => {
         return res.json(data)
 
     }).catch(e => {
-        return res.json({ error: e })
+        console.log(e)
+        
+        return res.json({ok:false,error:"error en la consulta"})
     })
 
 })
@@ -308,7 +374,10 @@ router.get('/mac', (req, res, next) => {
         return res.json(data)
 
     }).catch(e => {
-        return res.json({ error: e })
+        
+        console.log(e)
+        
+        return res.json({ok:false,error:"error en la consulta"})
     })
 
 })
@@ -320,7 +389,9 @@ router.get('/mac-activa', (req, res, next) => {
 
         return res.json(data)
     }).catch(e => {
-        return res.json({ error: e })
+        console.log(e)
+        
+        return res.json({ok:false,error:"error en la consulta"})
     })
 
 })
@@ -334,11 +405,15 @@ router.get('/cliente-activo', (req, res, next) => {
 
             return res.json(data[0])
         } else {
-            return res.json({ error: true })
+            console.log(e)
+        
+        return res.json({ok:false,error:"error en la consulta"})
         }
 
     }).catch(e => {
-        return res.json({ error: e })
+        console.log(e)
+        
+        return res.json({ok:false,error:"error en la consulta"})
     })
 
 })
@@ -352,7 +427,9 @@ router.get('/pendientes', (req, res, next) => {
 
 
     }).catch(e => {
-        return res.json({ error: e })
+        console.log(e)
+        
+        return res.json({ok:false,error:"error en la consulta"})
     })
 
 })

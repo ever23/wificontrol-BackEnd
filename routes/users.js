@@ -88,9 +88,32 @@ router.get('/logout', (req, res, next) => {
         res.json({ "logout": true })
     })
 })
+
+router.post('/primerRegistro', async (req, res, next) => {
+
+    let Request = req.body
+    let Users = req.sqlite.tabla('usuarios')
+    let result = Users.select()
+    if(result.length<1){
+        return res.json({ ok: false, error: "Ya existe un usuario registrado " })
+    }
+
+    if (Request['pass1'] != Request['pass2']) {
+        return res.json({ ok: false, error: "Contraseñas no coiciden " })
+    }
+    const salt = await bcrypt.genSaltSync(SALT);
+    const hash = await bcrypt.hashSync(Request['pass1'], salt);
+    Users.insert(null, Request['user'], hash, Request['nombre']).then(ok => {
+        return res.json({ ok: true, error: "" })
+
+    }).catch(e => {
+        return res.json({ ok: false, error: "Imposible registrar" })
+    })
+
+})
+
 router.post('/registro',auth, async (req, res, next) => {
-    delete req.cookies['connect.sid']
-    delete req.session.user
+
     let Request = req.body
 
     let Users = req.sqlite.tabla('usuarios')
@@ -103,7 +126,7 @@ router.post('/registro',auth, async (req, res, next) => {
         return res.json({ ok: true, error: "" })
 
     }).catch(e => {
-        return res.json({ ok: false, error: e })
+        return res.json({ ok: false, error: "Imposible registrar" })
     })
 
 })

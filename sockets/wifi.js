@@ -1,6 +1,6 @@
 const { Server } = require('socket.io');
 
-const mercusys = require("./mercusys.js")
+const mercusys = require("../lib/wifiScraping/mercusys.js")
 module.exports = (app, server) => {
 
     const io = new Server(server, {
@@ -18,15 +18,33 @@ module.exports = (app, server) => {
     io.on('connection', async (socket) => {
 
         console.log('nuevo conectado ')
+        let okConexion=false
         let WIFI = new mercusys()
-        let page = await WIFI.open()
+        try{
+            let page = await WIFI.open()
+        }catch(e){
+            console.log(e)
+            io.emit('error-conexion', "")
+            WIFI.close()
+            return ;
+
+        }
+        
+       
+       
         let Equipos = []
         WIFI.equiposConectados(json => {
+            if(!okConexion){
+                io.emit('ok-conexion', "")
+                okConexion=true
+            }
             Equipos = json.sort(function (a, b) {
                 return a.ip < b.ip;
             });
-            io.emit('equipos', Equipos)
-        }, "invitado")
+            io.emit('equipos', Equipos.filter(e=>e.type=="invitado"))
+            io.emit('equiposPrivados', Equipos.filter(e=>e.type=="privado"))
+        }, false)
+        
        
 
         socket.on('bloquear', async (MAC) => {
@@ -40,11 +58,12 @@ module.exports = (app, server) => {
            
         });
 
-        socket.on('desbloquear', async (MAC) => {
+        socket.on('desbloquear', async (MAC,nombre=null) => {
             console.log('desbloquear',MAC)
             let equipo = Equipos.find(e => e.mac == MAC)
             if(equipo!=undefined){
                 equipo.bloqueado = false
+                equipo.nombre =nombre==null? equipo.nombre:nombre
                 let r = await WIFI.actualizarEquipo(equipo)
                 console.log("desbloqueado", r, equipo)
             }
@@ -60,6 +79,10 @@ module.exports = (app, server) => {
             }
            
         });
+        socket.on('informacionInvitados', async (func) => {
+                func(await WIFI.redInvitados())
+        });
+       
 
         socket.on('disconnect', function () {
             WIFI.close()

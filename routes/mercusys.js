@@ -6,10 +6,8 @@ const mercusys = require("../lib/wifiScraping/mercusys.js")
 const puppeteer = require('puppeteer-core');
 router.get('/', async (req, res, next) => {
 
-  
     let wifi = new mercusys()
     let page = await wifi.open()
-    
     let respuesta = []
     wifi.equiposConectados(json => {
 
@@ -19,14 +17,29 @@ router.get('/', async (req, res, next) => {
    
 })
 
-router.post('/bloquear', auth, async (req, res, next) => {
+router.post('/bloquear', async (req, res, next) => {
 
     let wifi = new mercusys()
     let page = await wifi.open()
-    await wifi.verInvidatos()
-    let r = await wifi.bloqueraEquipo(req.body.ip)
-    res.json({ ok: r })
-    page.close()
+    wifi.equiposConectados(async json => {
+
+        try {
+        
+            let r = await wifi.actualizarEquipo({ mac: req.body.mac, nombre:"sala", bloqueado: true })
+            res.json({ ok: r })
+               
+        } catch (e) {
+            console.log(e)
+        } finally {
+            wifi.close()
+        }
+
+
+
+
+    }, "invitado")
+   
+   
 })
 router.post('/desbloquear', auth, async (req, res, next) => {
 
