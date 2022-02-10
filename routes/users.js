@@ -59,6 +59,31 @@ router.post('/', (req, res, next) => {
             }) 
         })
 });
+
+router.delete('/',async (req, res, next) => {
+    let user = req.query.id_usuarios
+    Users = req.sqlite.tabla('usuarios')
+    let usuario = await Users.selectOne("id_usuarios="+user)
+    if(!usuario){
+        res.json({
+            ok: false,
+            error: "El usuario no existe"
+        })
+    }
+    usuario.delete().then(ok=>{
+        res.json({
+            ok: true
+        })
+    }).catch(e=>{
+        console.log(e)
+        res.json({
+            ok: false,
+            error: "No fue posible eliminar"
+        })
+    })
+    
+});
+
 router.get('/islogin', (req, res, next) => {
     
     auth.auth(req).then(data => {
@@ -88,7 +113,23 @@ router.get('/logout', (req, res, next) => {
         res.json({ "logout": true })
     })
 })
+router.get('/isNew',(req, res, next) => {
 
+    let Users = req.sqlite.tabla('usuarios')
+    Users.select().then(data => {
+
+        if(data.length==0){
+            res.json({ok:false})
+        }else{
+            res.json({ok:true})
+        }
+        
+
+    }).catch(e => {
+        return res.json(e)
+    })
+
+})
 router.post('/primerRegistro', async (req, res, next) => {
 
     let Request = req.body

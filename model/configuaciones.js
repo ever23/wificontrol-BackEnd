@@ -6,30 +6,32 @@ const tablaModel = require("tabla-model")
 const configuraciones=new tablaModel("configuraciones",{
     colums:[
         {
-            name:"desc_notificacion",
+            name:"id",
+            type:"int(11)",
+            primary:true,
+            defaultNull:false 
+        },
+        {
+            name:"url_router",
+            type:"varchar(250)", 
+            defaultNull:false,
+        },
+        {
+            name:"pass_router",
             type:"varchar(250)",
             defaultNull:false,
         },
         {
-            name:"href_notificacion",
-            type:"varchar(250)",
-            defaultNull:false,
-        },
-        {
-            name:"icon_notification",
+            name:"costo_hora",
             type:"varchar(45)",
             defaultNull:false,
         },
         {
-            name:"fech_notificacion",
-            type:"DATETIME",
-            defaultNull:false,
-        },
-        {
-            name:"visto",
+            name:"modo_oscuro",
             type:"BOOLEAN",
             defaultNull:false,
         }
     ]
 })
+configuraciones.insert(1,"http://192.168.1.1/","admin1","3",false)
 module.exports = configuraciones

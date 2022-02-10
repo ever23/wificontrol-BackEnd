@@ -1,17 +1,15 @@
 const express = require('express')
 const router = express.Router()
 const { DateTime } = require("luxon");
-const axios = require("axios")
 const { sqlite3Result } = require("sqlite3-tab")
 const auth = require('../lib/auth.js');
 const notificaciones = require('../lib/notificaciones.js');
 const { calcularProgreso } = require('../lib/equipos.js');
 const mercusys = require("../lib/wifiScraping/mercusys.js")
-const costoHora = 3
 
 router.get('/estadisticas', auth, (req, res, next) => {
     let Equipos = req.sqlite.tabla('equipos')
-    let Clientes = req.sqlite.tabla('equipos')
+    let Clientes = req.sqlite.tabla('clientes')
     let time = DateTime.now()
     Equipos.selectOne([
         'SUM(iif(activo,1,0)) as activos',
@@ -22,7 +20,7 @@ router.get('/estadisticas', auth, (req, res, next) => {
         "SUM(iif(fecha LIKE '%" + time.toFormat("LL/yyyy") + "%' and tPago='',costo,0)) as deudas",
     ]).then(data => {
 
-        return Clientes.selectOne(['count() as cantidad']).then(d3 => {
+        return Clientes.selectOne(['count(id_cliente) as cantidad']).then(d3 => {
             let numberFormat = new Intl.NumberFormat('es-ES', {
                 minimumFractionDigits: 2
             })
@@ -122,8 +120,7 @@ router.get('/', auth, (req, res, next) => {
 router.get('/cliente', auth, (req, res, next) => {
 
     let Equipos = req.sqlite.tabla('equipos')
-    Equipos.select(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, "id_cliente=" + req.query.id_cliente + "",null,null,"tPago").then(data => {
-
+    Equipos.select(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, "id_cliente=" + req.query.id_cliente + "",null,null,"tPago, fecha ASC").then(data => {
         return res.json(data)
 
     }).catch(e => {
@@ -145,7 +142,7 @@ router.post('/', async (req, res, next) => {
     } else {
         let tiempoSplit = resData.tiempo.split(':')
         cierre = DateTime.now().plus({ hours: tiempoSplit[0], minutes: tiempoSplit[1] }).toFormat('HH:mm')
-        resData.costo = ((Number(tiempoSplit[0]) + (Number(tiempoSplit[1]) / 60)) * costoHora).toLocaleString('en')
+        resData.costo = ((Number(tiempoSplit[0]) + (Number(tiempoSplit[1]) / 60)) * req.configuraciones.costo_hora).toLocaleString('en')
     }
 
     if (resData.id_cliente == undefined) {
@@ -205,10 +202,11 @@ router.put('/tiempo', auth, async (req, res, next) => {
         if (equipo.id_equipo) {
             equipo.tiempo = update.tiempo
             let tiempoSplit = equipo.tiempo.split(':')
-            equipo.cierre = DateTime.now().plus({ hours: tiempoSplit[0], minutes: tiempoSplit[1] }).toFormat('HH:mm')
+            let time=DateTime.fromFormat(equipo.apertura,'HH:mm')
+            equipo.cierre = time.plus({ hours: tiempoSplit[0], minutes: tiempoSplit[1] }).toFormat('HH:mm')
             let progreso = calcularProgreso(equipo.tiempo, equipo.cierre)
 
-            equipo.costo = ((Number(tiempoSplit[0]) + (Number(tiempoSplit[1]) / 60)) * costoHora).toLocaleString('en')
+            equipo.costo = ((Number(tiempoSplit[0]) + (Number(tiempoSplit[1]) / 60)) * req.configuraciones.costo_hora).toLocaleString('en')
             if (progreso == 0 || equipo.fecha != DateTime.now().toFormat('dd/LL/yyyy')) {
                 equipo.activo = 0
             } else {
@@ -256,7 +254,7 @@ router.put('/', auth, (req, res, next) => {
         let eq = await Equipos.selectOne(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, 'id_equipo="' + req.body.id_equipo + '"')
         req.io.emit("/equipo/update/" + eq.id_equipo, eq)
         if (eq.activo) {
-            let wifi = new mercusys()
+            let wifi = new mercusys(req.configuraciones)
             let page = await wifi.open()
             wifi.equiposConectados(async json => {
                 try {
@@ -290,10 +288,10 @@ router.put('/cerrar', async (req, res, next) => {
         equipo.activo = false
         equipo.cierre = DateTime.now().toFormat("HH:mm")
         let tiempoSplit = equipo.tiempo.split(":")
-        equipo.costo = ((Number(tiempoSplit[0]) + (Number(tiempoSplit[1]) / 60)) * costoHora).toLocaleString('en')
+        equipo.costo = ((Number(tiempoSplit[0]) + (Number(tiempoSplit[1]) / 60)) * req.configuraciones.costo_hora).toLocaleString('en')
 
 
-        let wifi = new mercusys()
+        let wifi = new mercusys( req.configuraciones)
         let page = await wifi.open()
         wifi.equiposConectados(async json => {
             try {
@@ -332,7 +330,7 @@ router.put('/desactivar', auth, (req, res, next) => {
     Equipos.update({ activo: false }, { id_equipo: id_equipo }).then(d => {
         Equipos.selectOne(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, "id_equipo='" + id_equipo + "'").then(async d2 => {
             notificaciones.dispararNotificacion(sqlite, "A finalizado el tiempo del equipo " + d2.nombre + "", "", "", "")
-            let wifi = new mercusys(browser)
+            let wifi = new mercusys(req.configuraciones)
             let page = await wifi.open()
             await wifi.verInvidatos()
             let r = await wifi.bloqueraEquipo(req.body.ip)

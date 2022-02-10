@@ -11,9 +11,9 @@ const indexRouter = require('./routes/index')
 const history = require('connect-history-api-fallback');
 const passport = require('./lib/passport/local-auth.js')
 const http = require('http')
-const app = express();
+const app = express(); 
 const server = http.createServer(app)
-const io = require('./sockets/wifi')(app, server);
+
 // view engine setup
 app.set('views', path.join(__dirname, 'views'))
 app.set('view engine', 'ejs');
@@ -58,11 +58,13 @@ connect.connect(e => {
 })
 connect.pathModels(path.dirname(__filename) + '/model')
 
-app.use(function (req, res, next) {
+app.use(async (req, res, next)=>{
     req.sqlite = connect
+    let Configuraciones = req.sqlite.tabla('configuraciones')
+    req.configuraciones = await Configuraciones.selectOne()
     next()
 });
-
+const io = require('./sockets/wifi')(app, server,connect);
 app.use(history({
     index: 'index.html',
     disableDotRule: true,

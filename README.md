@@ -23,7 +23,7 @@
 # Instalar dependecias 
 npm install
 
-# inicia el servidro en modo desarrollo
+# inicia el servidor en modo desarrollo
 npm run dev
 
 
