@@ -1,7 +1,40 @@
 const { Server } = require('socket.io');
 
 const mercusys = require("../lib/wifiScraping/mercusys.js")
-module.exports = (app, server,sqlite) => {
+
+async function openBrowser(configuraciones,Conectados) {
+    return new Promise(async (resolve,rejec)=>{
+        let WIFI = new mercusys(configuraciones)
+        let okConexion = false;
+        try {
+            let page = await WIFI.open()
+           
+        } catch (e) {
+            console.log(e)
+            WIFI.close()
+            rejec(e)
+    
+        }
+        WIFI.equiposConectados(json => {
+            if (!okConexion) {
+               resolve(WIFI)
+                okConexion = true
+            }
+            Conectados(json)
+        }, false)
+        setTimeout(()=>{
+            if (!okConexion){
+                WIFI.close()
+                rejec("exedido el tiempo de 5000ms")
+            }
+        },5000)
+    })
+  
+  
+}
+
+
+module.exports = (app, server, sqlite) => {
 
     const io = new Server(server, {
         cors: {
@@ -15,46 +48,59 @@ module.exports = (app, server,sqlite) => {
         req.io = io
         next()
     })
+
+
     io.on('connection', async (socket) => {
- 
+
         console.log('nuevo conectado ')
-        let okConexion = false
-     
+      
+
         let configuraciones = await sqlite.tabla('configuraciones').selectOne()
-        let WIFI = new mercusys(configuraciones)
+        var WIFI = null;
+        let Equipos = [];
         try {
-            let page = await WIFI.open()
+
+            WIFI = openBrowser(configuraciones,(json)=>{
+                Equipos = json
+                Equipos.forEach(element => {
+                   
+                    io.emit('equipo/wifi/' + element.mac, element)
+                });
+                io.emit('equipos', Equipos)
+            })
+
+
         } catch (e) {
             console.log(e)
             io.emit('error-conexion', "")
-            WIFI.close()
+            socket
             return;
 
         }
+        WIFI.then(w=>{
+            io.emit('ok-conexion', "")
+            return w
+        }).catch(e=>{
+            io.emit('error-conexion', "")
+        })
 
-
-
-        let Equipos = []
-        WIFI.equiposConectados(json => {
-            if (!okConexion) {
-                io.emit('ok-conexion', "")
-                okConexion = true
-            }
-            Equipos = json.sort(function (a, b) {
-                return a.ip < b.ip;
-            });
-            io.emit('equipos', Equipos.filter(e => e.type == "invitado"))
-            io.emit('equiposPrivados', Equipos.filter(e => e.type == "privado"))
-        }, false)
+    
+       
 
 
 
         socket.on('bloquear', async (MAC) => {
             console.log('bloquear', MAC)
-            let equipo = Equipos.find(e => e.mac == MAC)
+            let equipo = {}
+            if (typeof MAC == "object") {
+                equipo = MAC
+            } else {
+                equipo = Equipos.find(e => e.mac == MAC)
+            }
+
             if (equipo != undefined) {
                 equipo.bloqueado = true
-                let r = await WIFI.actualizarEquipo(equipo)
+                let r = await (await WIFI).actualizarEquipo(equipo)
                 console.log("bloqueado", r, equipo)
             }
 
@@ -62,11 +108,17 @@ module.exports = (app, server,sqlite) => {
 
         socket.on('desbloquear', async (MAC, nombre = null) => {
             console.log('desbloquear', MAC)
-            let equipo = Equipos.find(e => e.mac == MAC)
+            let equipo = {}
+            if (typeof MAC == "object") {
+                equipo = MAC
+            } else {
+                equipo = Equipos.find(e => e.mac == MAC)
+            }
+
             if (equipo != undefined) {
                 equipo.bloqueado = false
                 equipo.nombre = nombre == null ? equipo.nombre : nombre
-                let r = await WIFI.actualizarEquipo(equipo)
+                let r = await (await WIFI).actualizarEquipo(equipo)
                 console.log("desbloqueado", r, equipo)
             }
         });
@@ -76,22 +128,25 @@ module.exports = (app, server,sqlite) => {
             let equipo = Equipos.find(e => e.mac == MAC)
             if (equipo != undefined) {
                 equipo.nombre = nombre
-                let r = await WIFI.actualizarEquipo(equipo)
+                let r = await (await WIFI).actualizarEquipo(equipo)
                 console.log("renombrar", r, equipo)
             }
 
         });
         socket.on('informacionInvitados', async (func) => {
-            func(await WIFI.redInvitados())
+            func(await (await WIFI).redInvitados())
         });
         socket.on('actualizarRedInvitados', async (data, func) => {
             console.log(data)
-            func(await WIFI.actualizarRedInvitados(data)) 
+            func(await (await WIFI).actualizarRedInvitados(data))
         });
 
 
-        socket.on('disconnect', function () {
-            WIFI.close()
+        socket.on('disconnect', async function () {
+
+            (await WIFI).close()
+
+
         });
 
     });

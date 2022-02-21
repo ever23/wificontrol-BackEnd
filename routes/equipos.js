@@ -37,7 +37,7 @@ router.get('/estadisticas', auth, (req, res, next) => {
         })
     }).catch(e => {
         console.log(e)
-        return res.json({ok:false,error:"Error al consultar "})
+        return res.json({ ok: false, error: "Error al consultar " })
     })
 
 
@@ -56,7 +56,7 @@ router.get('/hoy', auth, (req, res, next) => {
 
         }).catch(e => {
             console.log(e)
-            return res.json({ok:false,error:"Error al consultar "})
+            return res.json({ ok: false, error: "Error al consultar " })
         })
 
 })
@@ -74,7 +74,7 @@ router.get('/activos', (req, res, next) => {
 
         }).catch(e => {
             console.log(e)
-            return res.json({ok:false,error:"Error al consultar "})
+            return res.json({ ok: false, error: "Error al consultar " })
         })
 
 })
@@ -82,12 +82,16 @@ router.get('/activos', (req, res, next) => {
 router.get('/busqueda', auth, (req, res, next) => {
 
     let Equipos = req.sqlite.tabla('equipos')
-    let time = DateTime.now()
+    let mes = DateTime.now().toFormat("LL/yyyy") 
+  
+    if(req.query.mes!=undefined){
+        mes = req.query.mes
+    }
     Equipos.busqueda(req.query.q,
         ['clientes.nombre', 'equipos.tpago', 'equipos.referencia', 'equipos.fecha'],
         ['clientes.nombre', 'equipos.*'],
         { '>clientes': 'id_cliente' },
-        "fecha LIKE '%" + time.toFormat("LL/yyyy") + "%'",
+        "fecha LIKE '%" + mes + "%'",
         null,
         null,
         "id_equipo DESC")
@@ -97,11 +101,33 @@ router.get('/busqueda', auth, (req, res, next) => {
 
         }).catch(e => {
             console.log(e)
-            return res.json({ok:false,error:"error en la busqueda"})
+            return res.json({ ok: false, error: "error en la busqueda" })
         })
 
 })
+router.get('/reporte-mensual', auth, (req, res, next) => {
 
+    let Equipos = req.sqlite.tabla('equipos')
+    let time = DateTime.now()
+    let mes = req.query.mes
+    Equipos.select(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, "fecha LIKE '%" + mes + "%'", null, null, "id_equipo DESC")
+        .then(async data => {
+            let time = DateTime.now()
+            let estadisticas= await Equipos.selectOne([
+                "SUM(iif(fecha LIKE '%" +mes + "%' and tPago!='',costo,0)) as gananciames",
+                "SUM(iif(fecha LIKE '%" +mes + "%' and tPago='Efectivo',costo,0)) as efectivo",
+                "SUM(iif(fecha LIKE '%" +mes + "%' and tPago='Pagomovil',costo,0)) as pagomovil",
+                "SUM(iif(fecha LIKE '%" + mes + "%' and tPago='',costo,0)) as deudas",
+            ])
+
+            return res.json({equipos:data,estadisticas:estadisticas,ok:true})
+
+        }).catch(e => {
+            console.log(e)
+            return res.json({ ok: false, error: "Error al consultar " })
+        })
+
+})
 router.get('/', auth, (req, res, next) => {
 
     let Equipos = req.sqlite.tabla('equipos')
@@ -113,19 +139,19 @@ router.get('/', auth, (req, res, next) => {
 
         }).catch(e => {
             console.log(e)
-            return res.json({ok:false,error:"Error al consultar "})
+            return res.json({ ok: false, error: "Error al consultar " })
         })
 
 })
 router.get('/cliente', auth, (req, res, next) => {
 
     let Equipos = req.sqlite.tabla('equipos')
-    Equipos.select(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, "id_cliente=" + req.query.id_cliente + "",null,null,"tPago, fecha ASC").then(data => {
+    Equipos.select(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, "id_cliente=" + req.query.id_cliente + "", null, null, "tPago, fecha ASC").then(data => {
         return res.json(data)
 
     }).catch(e => {
         console.log(e)
-        return res.json({ok:false,error:"Error al consultar "})
+        return res.json({ ok: false, error: "Error al consultar " })
     })
 
 })
@@ -146,17 +172,17 @@ router.post('/', async (req, res, next) => {
     }
 
     if (resData.id_cliente == undefined) {
-        try{
+        try {
             await Clientes.insert(null, resData.nombre);
-        }catch(e){
+        } catch (e) {
             console.log(e)
-            return res.json({ ok: true, error: "Imposible agregar el cliente" }) 
+            return res.json({ ok: true, error: "Imposible agregar el cliente" })
         }
-        
+
         let cliente = await Clientes.selectOne(null, null, null, null, null, "id_cliente DESC");
         resData.id_cliente = cliente.id_cliente
     }
-    try{
+    try {
         await Equipos.insert(null,
             resData.id_cliente,
             resData.tiempo,
@@ -170,12 +196,12 @@ router.post('/', async (req, res, next) => {
             resData.mac,
             resData.ip
         );
-    }catch(e){
+    } catch (e) {
         console.log(e)
-        return res.json({ ok: true, error: "Imposible agregar el Equipo" }) 
+        return res.json({ ok: true, error: "Imposible agregar el Equipo" })
     }
-    
-    let equipo = await  Equipos.selectOne(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, null, null, null, "id_equipo DESC")
+
+    let equipo = await Equipos.selectOne(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, null, null, null, "id_equipo DESC")
     req.io.emit("/equipo/registro", equipo)
     return res.json({ ok: true, data: equipo })
 
@@ -188,7 +214,7 @@ router.delete('/', auth, (req, res, next) => {
     Equipos.delete({ id_equipo: req.query.id_equipo }).
         then(data => {
 
-            return res.json({ ok: true})
+            return res.json({ ok: true })
         }).catch(e => {
             console.log(e)
             return res.json({ ok: true, error: "No se eliminó" })
@@ -200,18 +226,25 @@ router.put('/tiempo', auth, async (req, res, next) => {
     try {
         let equipo = await req.sqlite.tabla('equipos').selectOne(['clientes.nombre', 'equipos.*'], { '>clientes': 'id_cliente' }, 'id_equipo="' + req.body.id_equipo + '"')
         if (equipo.id_equipo) {
-            equipo.tiempo = update.tiempo
-            let tiempoSplit = equipo.tiempo.split(':')
-            let time=DateTime.fromFormat(equipo.apertura,'HH:mm')
-            equipo.cierre = time.plus({ hours: tiempoSplit[0], minutes: tiempoSplit[1] }).toFormat('HH:mm')
-            let progreso = calcularProgreso(equipo.tiempo, equipo.cierre)
-
-            equipo.costo = ((Number(tiempoSplit[0]) + (Number(tiempoSplit[1]) / 60)) * req.configuraciones.costo_hora).toLocaleString('en')
-            if (progreso == 0 || equipo.fecha != DateTime.now().toFormat('dd/LL/yyyy')) {
-                equipo.activo = 0
-            } else {
+            if (update.libre) {
+                equipo.tiempo = "Indefinido"
+                equipo.cierre = "Indefinido"
                 equipo.activo = 1
+            } else {
+                equipo.tiempo = update.tiempo
+                let tiempoSplit = equipo.tiempo.split(':')
+                let time = DateTime.fromFormat(equipo.apertura, 'HH:mm')
+                equipo.cierre = time.plus({ hours: tiempoSplit[0], minutes: tiempoSplit[1] }).toFormat('HH:mm')
+                let progreso = calcularProgreso(equipo.tiempo, equipo.cierre)
+
+                equipo.costo = ((Number(tiempoSplit[0]) + (Number(tiempoSplit[1]) / 60)) * req.configuraciones.costo_hora).toLocaleString('en')
+                if (progreso == 0 || equipo.fecha != DateTime.now().toFormat('dd/LL/yyyy')) {
+                    equipo.activo = 0
+                } else {
+                    equipo.activo = 1
+                }
             }
+
 
             await equipo.update()
             req.io.emit("/equipo/update/" + equipo.id_equipo, equipo)
@@ -234,7 +267,7 @@ router.put('/pago', auth, async (req, res, next) => {
 
             await equipo.update()
             req.io.emit("/equipo/update/" + equipo.id_equipo, equipo)
-            res.json({ ok: true})
+            res.json({ ok: true })
 
         }
     } catch (e) {
@@ -291,7 +324,7 @@ router.put('/cerrar', async (req, res, next) => {
         equipo.costo = ((Number(tiempoSplit[0]) + (Number(tiempoSplit[1]) / 60)) * req.configuraciones.costo_hora).toLocaleString('en')
 
 
-        let wifi = new mercusys( req.configuraciones)
+        let wifi = new mercusys(req.configuraciones)
         let page = await wifi.open()
         wifi.equiposConectados(async json => {
             try {
@@ -318,7 +351,7 @@ router.put('/cerrar', async (req, res, next) => {
         return res.json({ ok: true, data: equipo })
     } catch (e) {
         console.log(e)
-        return res.json({ok:false,error:"error "})
+        return res.json({ ok: false, error: "error " })
     }
 })
 
@@ -359,8 +392,8 @@ router.get('/equipo', (req, res, next) => {
 
     }).catch(e => {
         console.log(e)
-        
-        return res.json({ok:false,error:"error en la consulta"})
+
+        return res.json({ ok: false, error: "error en la consulta" })
     })
 
 })
@@ -372,10 +405,10 @@ router.get('/mac', (req, res, next) => {
         return res.json(data)
 
     }).catch(e => {
-        
+
         console.log(e)
-        
-        return res.json({ok:false,error:"error en la consulta"})
+
+        return res.json({ ok: false, error: "error en la consulta" })
     })
 
 })
@@ -388,8 +421,8 @@ router.get('/mac-activa', (req, res, next) => {
         return res.json(data)
     }).catch(e => {
         console.log(e)
-        
-        return res.json({ok:false,error:"error en la consulta"})
+
+        return res.json({ ok: false, error: "error en la consulta" })
     })
 
 })
@@ -404,14 +437,14 @@ router.get('/cliente-activo', (req, res, next) => {
             return res.json(data[0])
         } else {
             console.log(e)
-        
-        return res.json({ok:false,error:"error en la consulta"})
+
+            return res.json({ ok: false, error: "error en la consulta" })
         }
 
     }).catch(e => {
         console.log(e)
-        
-        return res.json({ok:false,error:"error en la consulta"})
+
+        return res.json({ ok: false, error: "error en la consulta" })
     })
 
 })
@@ -426,8 +459,8 @@ router.get('/pendientes', (req, res, next) => {
 
     }).catch(e => {
         console.log(e)
-        
-        return res.json({ok:false,error:"error en la consulta"})
+
+        return res.json({ ok: false, error: "error en la consulta" })
     })
 
 })

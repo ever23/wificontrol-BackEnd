@@ -1,12 +1,14 @@
 {
   "name": "wificontrol-js",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "nodemon app.js",
     "start": "node ./bin/www",
     "pro": "pm2 start app.js --name wificontrol",
-    "run-db": "node ./sqlite.js"
+    "run-db": "node ./sqlite.js",
+    "lint": "eslint  ./index.js ./lib",
+    "test": "mocha ./test/index.js --timeout 120000"
   },
   "dependencies": {
     "axios": "^0.24.0",

@@ -90,9 +90,8 @@ router.get('/islogin', (req, res, next) => {
         let resData = {
             id_user: data.id_usuarios,
             user: data.user,
-            nombres: data.nombres,
-            apellidos: data.apellidos,
-            permisos: data.permisos,
+            nombre: data.nombre,
+            root: data.root,
             token: req.sessionID,
             login: true
         }
@@ -144,7 +143,7 @@ router.post('/primerRegistro', async (req, res, next) => {
     }
     const salt = await bcrypt.genSaltSync(SALT);
     const hash = await bcrypt.hashSync(Request['pass1'], salt);
-    Users.insert(null, Request['user'], hash, Request['nombre']).then(ok => {
+    Users.insert(null, Request['user'], hash, Request['nombre'],true).then(ok => {
         return res.json({ ok: true, error: "" })
 
     }).catch(e => {
@@ -163,7 +162,7 @@ router.post('/registro',auth, async (req, res, next) => {
     }
     const salt = await bcrypt.genSaltSync(SALT);
     const hash = await bcrypt.hashSync(Request['pass1'], salt);
-    Users.insert(null, Request['user'], hash, Request['nombre']).then(ok => {
+    Users.insert(null, Request['user'], hash, Request['nombre'],false).then(ok => {
         return res.json({ ok: true, error: "" })
 
     }).catch(e => {
